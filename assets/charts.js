@@ -224,97 +224,60 @@ function stackedBarChart(container, { categories, series, yFormat = fmtEUR, heig
 }
 
 /**
- * Einfaches Liniendiagramm mit Nulllinie und Break-even-Marker (fuer die Nullrechnung).
- * points: [{x: Anzahl, y: Ergebnis}]
+ * Meter: zeigt einen Wert (z.B. erreichter Deckungsbeitrag) im Verhaeltnis zu
+ * einem Zielwert (z.B. Fixkosten) als gefuellten Balken mit Ziel-Markierung.
+ * Direkt an die aktuellen Reglerwerte gekoppelt - keine Hochrechnung/Extrapolation.
  */
-function breakEvenChart(container, { points, breakEvenX, color = "var(--series-1)", height = 260 }) {
+function meterChart(container, { value, target, good, valueLabel = "Deckungsbeitrag", targetLabel = "Fixkosten", targetShort = targetLabel, height = 150 }) {
   const width = Math.max(560, container.clientWidth || 640);
-  const marginL = 70, marginR = 20, marginT = 20, marginB = 32;
+  const marginL = 24, marginR = 24, marginT = 48;
   const plotW = width - marginL - marginR;
-  const plotH = height - marginT - marginB;
+  const barH = 32;
+  const barY = marginT;
 
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  const maxX = Math.max(...xs, 1);
-  const maxAbsY = niceMax(Math.max(...ys.map(Math.abs), 1));
-  const minY = -maxAbsY, maxY = maxAbsY;
+  const maxV = niceMax(Math.max(value, target, 1));
+  const x = (v) => marginL + (Math.min(Math.max(v, 0), maxV) / maxV) * plotW;
 
-  const x = (v) => marginL + (v / maxX) * plotW;
-  const y = (v) => marginT + plotH - ((v - minY) / (maxY - minY)) * plotH;
+  const color = good ? "var(--good)" : "var(--critical)";
+  const trackColor = `color-mix(in srgb, ${color} 14%, var(--surface-1))`;
 
   const svg = el("svg", { class: "chart", viewBox: `0 0 ${width} ${height}`, width: "100%", height });
 
-  [minY, minY / 2, 0, maxY / 2, maxY].forEach((v) => {
-    const gy = y(v);
-    el("line", { class: "grid-line", x1: marginL, x2: width - marginR, y1: gy, y2: gy }, svg);
-    el("text", { class: "tick-label", x: marginL - 8, y: gy + 4, "text-anchor": "end" }, svg).textContent = fmtEUR(v);
-  });
+  // Track (volle Skala) + Fuellung (aktueller Wert)
+  el("rect", { x: marginL, y: barY, width: plotW, height: barH, rx: 8, fill: trackColor }, svg);
+  const fillW = Math.max(x(value) - marginL, 0);
+  const fillRect = el("rect", { x: marginL, y: barY, width: fillW, height: barH, rx: 8, fill: color }, svg);
+  fillRect.style.cursor = "pointer";
+  fillRect.addEventListener("mousemove", (e) => showTooltip(e, `<b>${valueLabel}</b><br>${fmtEUR(value)}`));
+  fillRect.addEventListener("mouseleave", hideTooltip);
 
-  // Nulllinie betont
-  el("line", { class: "baseline", x1: marginL, x2: width - marginR, y1: y(0), y2: y(0), "stroke-width": 1.5 }, svg);
-
-  [0, maxX * 0.25, maxX * 0.5, maxX * 0.75, maxX].forEach((v) => {
-    el("text", { class: "tick-label", x: x(v), y: height - 8, "text-anchor": "middle" }, svg).textContent = fmtNum(v);
-  });
-
-  const d = points.map((p, i) => (i === 0 ? "M" : "L") + x(p.x).toFixed(1) + "," + y(p.y).toFixed(1)).join(" ");
-  el("path", { d, fill: "none", stroke: color, "stroke-width": 2.5, "stroke-linecap": "round" }, svg);
-
-  // Hover-Layer: Crosshair + Tooltip, Wert linear zwischen den Stuetzpunkten interpoliert.
-  const sorted = [...points].sort((a, b) => a.x - b.x);
-  const interpolateY = (vx) => {
-    if (vx <= sorted[0].x) return sorted[0].y;
-    if (vx >= sorted[sorted.length - 1].x) return sorted[sorted.length - 1].y;
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const a = sorted[i], b = sorted[i + 1];
-      if (vx >= a.x && vx <= b.x) {
-        const t = (vx - a.x) / (b.x - a.x);
-        return a.y + t * (b.y - a.y);
-      }
-    }
-    return 0;
-  };
-  const crosshair = el("line", {
-    x1: 0, x2: 0, y1: marginT, y2: marginT + plotH, stroke: "var(--text-muted)",
-    "stroke-width": 1, opacity: 0,
+  // Ziel-Markierung (Fixkosten)
+  const tx = x(target);
+  el("line", {
+    x1: tx, x2: tx, y1: barY - 10, y2: barY + barH + 10, stroke: "var(--text-primary)", "stroke-width": 2,
   }, svg);
-  const hoverDot = el("circle", { r: 4, fill: color, opacity: 0 }, svg);
-  const overlay = el("rect", {
-    x: marginL, y: marginT, width: plotW, height: plotH, fill: "transparent", style: "cursor:crosshair",
+  const targetHit = el("rect", {
+    x: tx - 7, y: barY - 10, width: 14, height: barH + 20, fill: "transparent",
   }, svg);
-  overlay.addEventListener("mousemove", (e) => {
-    const rect = svg.getBoundingClientRect();
-    const scale = width / rect.width;
-    const px = (e.clientX - rect.left) * scale;
-    const vx = Math.max(0, Math.min(maxX, ((px - marginL) / plotW) * maxX));
-    const vy = interpolateY(vx);
-    crosshair.setAttribute("x1", x(vx));
-    crosshair.setAttribute("x2", x(vx));
-    crosshair.setAttribute("opacity", 1);
-    hoverDot.setAttribute("cx", x(vx));
-    hoverDot.setAttribute("cy", y(vy));
-    hoverDot.setAttribute("opacity", 1);
-    showTooltip(e, `${fmtNum(vx)} Getränke<br><b>Ergebnis: ${fmtEUR(vy)}</b>`);
-  });
-  overlay.addEventListener("mouseleave", () => {
-    crosshair.setAttribute("opacity", 0);
-    hoverDot.setAttribute("opacity", 0);
-    hideTooltip();
-  });
+  targetHit.style.cursor = "pointer";
+  targetHit.addEventListener("mousemove", (e) => showTooltip(e, `<b>${targetLabel}</b><br>${fmtEUR(target)}`));
+  targetHit.addEventListener("mouseleave", hideTooltip);
 
-  if (breakEvenX !== null && breakEvenX <= maxX) {
-    const bx = x(breakEvenX);
-    el("line", {
-      x1: bx, x2: bx, y1: marginT, y2: marginT + plotH, stroke: "var(--text-muted)",
-      "stroke-width": 1, "stroke-dasharray": "4 4",
-    }, svg);
-    el("circle", { cx: bx, cy: y(0), r: 5, fill: "var(--good)" }, svg);
-    const label = el("text", {
-      class: "tick-label", x: bx, y: marginT - 4, "text-anchor": breakEvenX > maxX * 0.75 ? "end" : "middle",
-      fill: "var(--text-primary)", "font-weight": "600",
-    }, svg);
-    label.textContent = `Break-even: ${fmtNum(breakEvenX)} Getränke`;
-  }
+  const targetAnchor = tx > width - marginR - 70 ? "end" : tx < marginL + 70 ? "start" : "middle";
+  el("text", {
+    class: "tick-label", x: tx, y: barY + barH + 26, "text-anchor": targetAnchor,
+  }, svg).textContent = `${targetLabel}: ${fmtEUR(target)}`;
+
+  // Abstand zum Ziel - die eigentliche Antwort auf "wie weit darueber/darunter".
+  const gap = value - target;
+  const gapX = x(value);
+  const gapAnchor = gapX > width - marginR - 90 ? "end" : gapX < marginL + 90 ? "start" : "middle";
+  const gapText = el("text", {
+    x: gapX, y: barY - 18, "text-anchor": gapAnchor, "font-weight": "700", "font-size": "15px", fill: color,
+  }, svg);
+  gapText.textContent = good
+    ? `▲ ${fmtEUR(gap)} über den ${targetShort}`
+    : `▼ ${fmtEUR(-gap)} unter den ${targetShort}`;
 
   container.innerHTML = "";
   container.appendChild(svg);

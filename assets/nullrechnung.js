@@ -198,19 +198,14 @@ function renderBreakevenList(container) {
 }
 
 function renderChart(container, totals) {
-  const fix = totals.fix;
-  const avgMargin = totals.anzahl > 0 ? totals.db / totals.anzahl : 0;
-  const maxScale = 1.6;
-  const maxX = Math.max(totals.anzahl * maxScale, 1);
-  const points = [];
-  const steps = 20;
-  for (let i = 0; i <= steps; i++) {
-    const x = (maxX * i) / steps;
-    const y = avgMargin * x - fix;
-    points.push({ x, y });
-  }
-  const breakEvenX = avgMargin > 0 ? fix / avgMargin : null;
-  breakEvenChart(container, { points, breakEvenX, color: "var(--series-1)" });
+  meterChart(container, {
+    value: totals.umsatz,
+    target: totals.gesamtkosten,
+    good: totals.ergebnis >= 0,
+    valueLabel: "Umsatz Getränke",
+    targetLabel: "Gesamtkosten (Fix + Einkauf)",
+    targetShort: "Gesamtkosten",
+  });
 }
 
 function recalc() {
@@ -251,10 +246,11 @@ function renderNullrechnung() {
     </div>
 
     <div class="card">
-      <h2>Ergebnis in Abhängigkeit von der verkauften Menge</h2>
+      <h2>Wie weit bin ich von der Nullrechnung entfernt?</h2>
       <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-4px;">
-        Alle Getränke-Mengen proportional zur aktuellen Reglereinstellung skaliert. Die Markierung zeigt, ab wie
-        vielen verkauften Getränken die Fixkosten gedeckt sind.
+        Balken = Umsatz deiner aktuellen Reglereinstellung. Strich = Gesamtkosten (Fixkosten + Einkaufspreise der
+        verkauften Getränke) - der Strich wandert also mit, wenn du mehr Getränke einstellst, da auch mehr
+        eingekauft werden muss. Der Text darüber zeigt, wie weit Umsatz und Gesamtkosten auseinanderliegen.
       </p>
       <div class="chart-wrap" id="null-chart"></div>
     </div>
