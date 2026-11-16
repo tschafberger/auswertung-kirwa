@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kirwa Auswertung</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>Kirwa Auswertung</h1>
+    <p class="subtitle">Vergangene Zahlen im Überblick und Nullrechnung für die Getränke-Kalkulation.</p>
+    <nav class="tabs">
+      <button data-tab="historie" class="active">Historie</button>
+      <button data-tab="nullrechnung">Nullrechnung</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="view-historie" class="view active"></section>
+    <section id="view-nullrechnung" class="view"></section>
+  </main>
+
+  <footer class="app-footer">
+    Historie aus data/kirwa_daten.csv · Kalkulationsgrundlage aus data/KVE_Getraenke_Fest_Kalkulation_Regler.xlsx
+  </footer>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/charts.js"></script>
+  <script src="assets/historie.js"></script>
+  <script src="assets/nullrechnung.js"></script>
+  <script src="assets/main.js"></script>
+</body>
+</html>
